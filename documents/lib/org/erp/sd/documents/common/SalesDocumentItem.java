@@ -1,4 +1,4 @@
-package org.erp.sd.common;
+package org.erp.sd.documents.common;
 
 public class SalesDocumentItem implements Comparable<SalesDocumentItem> {
     private SalesDocument sd;

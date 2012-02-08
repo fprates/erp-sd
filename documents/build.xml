@@ -1,0 +1,77 @@
+<project name="documents" default="compile">
+    <property name="builddir" value="${basedir}/build"/>
+    <property name="debug.status" value="true"/>
+    <property name="server.class" value="org.${ant.project.name}.Servlet"/>
+    <property name="warfilename"
+    	value="${basedir}/erpsd-${ant.project.name}.war"/>
+    
+    <taskdef name="undeploy" classname="org.apache.catalina.ant.UndeployTask"/>
+    <taskdef name="deploy" classname="org.apache.catalina.ant.DeployTask"/>
+	
+    <target name="compile">
+        <mkdir dir="${builddir}/${ant.project.name}/web"/>
+        <mkdir dir="${builddir}/${ant.project.name}/lib"/>
+        <mkdir dir="${builddir}/${ant.project.name}/classes"/>
+    	
+        <!-- dependências -->
+        <path id="dependencies">
+            <fileset dir="${basedir}/lib"/>
+            <fileset dir="${basedir}/ext"/>
+            <fileset dir="${builddir}/${ant.project.name}/lib"/>
+        </path>
+        
+        <!-- substituições -->
+        <copy todir="${builddir}/${ant.project.name}/web" file=
+        	"${basedir}/src/${ant.project.name}/web/web.xml"/>
+        
+        <replace file="${builddir}/${ant.project.name}/web/web.xml"
+            token="@server.class@" value="${server.class}"/>
+    	
+        <!-- compilação lib -->
+        <mkdir dir="${builddir}/tmp"/>
+        <javac srcdir="${basedir}/src/${ant.project.name}/"
+        	destdir="${builddir}/tmp" debug="${debug.status}">
+            <classpath refid="dependencies"/>
+        </javac>
+        
+        <jar basedir="${builddir}/tmp"
+             destfile="${builddir}/lib/erpsd-${ant.project.name}.jar"/>
+        <delete dir="${builddir}/tmp"/>
+    	
+        <!-- compilação classes -->
+        <javac srcdir="${basedir}/src/${ant.project.name}/"
+        	destdir="${builddir}/${ant.project.name}/classes"
+        	debug="${debug.status}">
+            <classpath refid="dependencies"/>
+        </javac>
+        
+        <copy todir="${builddir}/${ant.project.name}/classes">
+            <fileset dir="${basedir}/src/${ant.project.name}/classes"
+            	excludes="**/*.java"/>
+        </copy>
+        
+        <!-- pacote .war -->
+        <war destfile="${warfilename}"
+            webxml="${builddir}/${ant.project.name}/web/web.xml">
+            <webinf dir="${basedir}/src/${ant.project.name}/web/">
+                <exclude name="web.xml"/>
+                <include name="**/*"/> 
+            </webinf>
+            <lib dir="${builddir}/${ant.project.name}/lib" includes="*.jar"/>
+            <lib dir="${basedir}/lib" includes="*.jar"/>
+            <classes dir="${builddir}/${ant.project.name}/classes"/>
+        </war>
+
+        <condition property="manager_url" value="${url}/manager/text"
+        	else="${url}/manager">
+            <equals arg1="${tomcat_version}" arg2="7"/>
+        </condition>
+        
+        <undeploy url="${manager_url}" username="${username}"
+    	    password="${password}" path="/${ant.project.name}"
+        	failonerror="false"/>
+        <deploy url="${manager_url}" username="${username}"
+        	password="${password}" path="/${ant.project.name}"
+        	war="file:${warfilename}" failonerror="false"/>
+    </target>
+</project>

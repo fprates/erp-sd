@@ -1,4 +1,4 @@
-package org.erp.sd.common;
+package org.erp.sd.documents.common;
 
 import java.util.Set;
 import java.util.TreeSet;
