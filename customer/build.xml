@@ -1,4 +1,4 @@
-<project name="documents" default="compile">
+<project name="customer" default="compile">
     <property name="builddir" value="${basedir}/build"/>
     <property name="debug.status" value="true"/>
     <property name="server.class"
