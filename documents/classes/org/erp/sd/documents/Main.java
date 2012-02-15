@@ -1,5 +1,7 @@
 package org.erp.sd.documents;
 
+import org.erp.sd.documents.common.SalesDocument;
+import org.erp.sd.documents.common.SalesDocumentItem;
 import org.iocaste.shell.common.AbstractPage;
 import org.iocaste.shell.common.Button;
 import org.iocaste.shell.common.Const;
@@ -10,16 +12,19 @@ import org.iocaste.shell.common.Element;
 import org.iocaste.shell.common.Form;
 import org.iocaste.shell.common.InputComponent;
 import org.iocaste.shell.common.Table;
+import org.iocaste.shell.common.TableColumn;
 import org.iocaste.shell.common.TableItem;
 import org.iocaste.shell.common.TextField;
 import org.iocaste.shell.common.ViewData;
 
 public class Main extends AbstractPage {
-    private static final int CREATE = 0;
-    private static final int SHOW = 1;
+    private static final byte CREATE = 0;
+    private static final byte SHOW = 1;
+    private static final byte UPDATE = 2;
     private static final String[] TITLES = {
         "sales-document-create",
-        "sales-document-show"
+        "sales-document-show",
+        "sales-document-update"
     };
     
     public void add(ViewData vdata) {
@@ -58,7 +63,7 @@ public class Main extends AbstractPage {
         DataForm header;
         Table itens;
         Container container = new Form(null, "base");
-        int mode = (Integer)vdata.getParameter("mode");
+        byte mode = (Byte)vdata.getParameter("mode");
         
         if (mode != SHOW)
             new Button(container, "newcustomer");
@@ -68,23 +73,34 @@ public class Main extends AbstractPage {
         new DataItem(header, Const.TEXT_FIELD, "receb");
         
         itens = new Table(container, "itens");
-        itens.addColumn("nrpos");
-        itens.addColumn("cdmat");
-        itens.addColumn("quant");
-        itens.addColumn("unqtd");
+        new TableColumn(itens, "nrpos");
+        new TableColumn(itens, "cdmat");
+        new TableColumn(itens, "quant");
+        new TableColumn(itens, "unqtd");
         itens.setMark(true);
         
         switch(mode) {
         case CREATE:
             addTableItem(itens);
+            
+            new Button(container, "add");
+            new Button(container, "remove");
+            new Button(container, "save");
+            new Button(container, "validate");
+            
             break;
+            
+        case UPDATE:
+            new Button(container, "add");
+            new Button(container, "remove");
+            new Button(container, "save");
+            new Button(container, "validate");
+            
+            break;
+            
         case SHOW:
             break;
         }
-        
-        new Button(container, "add");
-        new Button(container, "remove");
-        new Button(container, "save");
         
         vdata.setNavbarActionEnabled("back", true);
         vdata.setTitle(TITLES[mode]);
@@ -97,6 +113,12 @@ public class Main extends AbstractPage {
         vdata.redirect(null, "baseform");
     }
     
+    public final String getTableValue(TableItem item, String name) {
+        InputComponent input = (InputComponent)item.get(name);
+        
+        return input.getValue();
+    }
+    
     public final void main(ViewData vdata) {
         Container container = new Form(null, "main");
         DataForm form = new DataForm(container, "document");
@@ -105,9 +127,9 @@ public class Main extends AbstractPage {
 //        new DataItem(form, Const.RADIO_BUTTON, "dvtype");
         
         
-        form.addAction("create");
-        form.addAction("show");
-        form.addAction("update");
+        new Button(container, "create");
+        new Button(container, "show");
+        new Button(container, "update");
         
         vdata.addContainer(container);
         vdata.setTitle("sales-document-selector");
@@ -119,11 +141,6 @@ public class Main extends AbstractPage {
         vdata.redirect("erp-sd-customer", "baseform");
     }
     
-    public final void newmaterial(ViewData vdata) {
-        vdata.export("mode", CREATE);
-        vdata.redirect("erpmm", "main");
-    }
-    
     public final void remove(ViewData vdata) {
         Table table = (Table)vdata.getElement("itens");
         
@@ -133,20 +150,97 @@ public class Main extends AbstractPage {
     }
     
     public final void save(ViewData vdata) throws Exception {
+        SalesDocumentItem sditem;
+        byte modo = (Byte)vdata.getParameter("mode");
+        Table itens = (Table)vdata.getElement("itens");
+        SD sd = new SD();
+        SalesDocument sddoc = new SalesDocument();
         
+        for (TableItem item : itens.getItens()) {
+            sditem = new SalesDocumentItem();
+            sditem.setId(Integer.parseInt(getTableValue(item, "nrpos")));
+            sditem.setSalesDocument(sddoc);
+            
+            sddoc.add(sditem);
+        }
+        
+        switch (modo) {
+        case CREATE:
+            sd.save(sddoc);
+            vdata.setReloadableView(true);
+            vdata.export("mode", UPDATE);
+            
+            break;
+        case UPDATE:
+            sd.update(sddoc);
+            
+            break;
+        }
+            
+    }
+    
+    private final SalesDocument select(int ident) {
+        SD sd;
+        SalesDocument sddoc;
+        
+        sd = new SD();
+        sddoc = sd.get(ident);
+        
+        return (sddoc == null)?null : sddoc;
     }
     
     public final void show(ViewData vdata) {
+        SalesDocument sddoc;
         DataForm form = (DataForm)vdata.getElement("document");
-        String ident = form.getValue("ident");
+        int ident = toInteger(form.getValue("ident"));
         
-        if (ident.equals("")) {
+        
+        if (ident == 0) {
             vdata.message(Const.ERROR, "document.identifier.obligatory");
             return;
         }
         
+        sddoc = select(ident);
+        
+        if (sddoc == null) {
+            vdata.message(Const.ERROR, "invalid.sales.order");
+            return;
+        }
+        
+        vdata.export("sddoc", sddoc);
         vdata.setReloadableView(true);
         vdata.export("mode", SHOW);
         vdata.redirect(null, "baseform");
+    }
+    
+    private final int toInteger(String value) {
+        return (value.equals(""))? 0 : Integer.parseInt(value);
+    }
+    
+    public final void update(ViewData vdata) {
+        SalesDocument sddoc;
+        DataForm form = (DataForm)vdata.getElement("document");
+        int ident = toInteger(form.getValue("ident"));
+        
+        if (ident == 0) {
+            vdata.message(Const.ERROR, "document.identifier.obligatory");
+            return;
+        }
+        
+        sddoc = select(ident);
+        
+        if (sddoc == null) {
+            vdata.message(Const.ERROR, "invalid.sales.order");
+            return;
+        }
+        
+        vdata.export("sddoc", sddoc);
+        vdata.export("mode", UPDATE);
+        vdata.setReloadableView(true);
+        vdata.redirect(null, "baseform");
+    }
+    
+    public final void validate(ViewData vdata) {
+        
     }
 }
